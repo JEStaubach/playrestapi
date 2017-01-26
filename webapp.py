@@ -69,35 +69,39 @@ class HoppersWebService(object):
     def DELETE(self, **kwargs):
         return 'DELETE:/hoppers/' + str(kwargs)
 
+class ws():
+    def __init__(self):
+        db_conf = DBConfig()
+        if not 'DB' in db_conf.settings.keys():
+            db_conf.settings['DB'] = {}
+        if not 'db_name' in db_conf.settings['DB'].keys():
+            db_conf.settings['DB']['db_name'] = input('db_name:')
+        if not 'db_user' in db_conf.settings['DB'].keys():
+            db_conf.settings['DB']['db_user'] = input('db_user:')
+        if not 'db_pass' in db_conf.settings['DB'].keys():
+            db_conf.settings['DB']['db_pass'] = getpass.getpass('Password:')
+        print("name {}".format(db_conf.settings['DB']['db_name']))
+        print("user {}".format(db_conf.settings['DB']['db_user']))
+        cherrypy.tree.mount(
+            HoppersWebService(),
+            '/hoppers',
+            {
+                '/': {
+                    'request.dispatch': cherrypy.dispatch.MethodDispatcher()
+                },
+            }, )
+        #     cherrypy.tree.mount(
+        #         Root(),
+        #         '/',
+        #         {
+        #             '/': {
+        #                 'tools.sessions.on': True,
+        #                 'tools.staticdir.root': os.path.abspath(os.getcwd())
+        #             }
+        #         }
+        #     )
+        cherrypy.engine.start()
+        cherrypy.engine.block()
+
 if __name__ == '__main__':
-    db_conf = DBConfig()
-    if not 'DB' in db_conf.settings.keys():
-        db_conf.settings['DB'] = {}
-    if not 'db_name' in db_conf.settings['DB'].keys():
-        db_conf.settings['DB']['db_name'] = input('db_name:')
-    if not 'db_user' in db_conf.settings['DB'].keys():
-        db_conf.settings['DB']['db_user'] = input('db_user:')
-    if not 'db_pass' in db_conf.settings['DB'].keys():
-        db_conf.settings['DB']['db_pass'] = getpass.getpass('Password:')
-    print("name {}".format(db_conf.settings['DB']['db_name']))
-    print("user {}".format(db_conf.settings['DB']['db_user']))
-    cherrypy.tree.mount(
-        HoppersWebService(),
-        '/hoppers',
-        {
-            '/': {
-                'request.dispatch': cherrypy.dispatch.MethodDispatcher()
-            },
-        },)
-#     cherrypy.tree.mount(
-#         Root(),
-#         '/',
-#         {
-#             '/': {
-#                 'tools.sessions.on': True,
-#                 'tools.staticdir.root': os.path.abspath(os.getcwd())
-#             }
-#         }
-#     )
-    cherrypy.engine.start()
-    cherrypy.engine.block()
+    foo = ws()
