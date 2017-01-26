@@ -39,7 +39,7 @@ def get_list(list_name, params):
                                   database=db_conf.settings['DB']['db_user'] + '$' + db_conf.settings['DB']['db_name'])
     cursor = cnx.cursor()
 
-    query = ("SELECT * FROM " + list_name )
+    query = ("SELECT * FROM " + list_name + "_tbl" )
 
 
     cursor.execute(query)
