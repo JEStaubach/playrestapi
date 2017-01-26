@@ -100,6 +100,7 @@ class ws():
         #             }
         #         }
         #     )
+        cherrypy.config.update({'server.socket_port': 80})
         cherrypy.engine.start()
         cherrypy.engine.block()
 
