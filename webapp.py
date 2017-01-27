@@ -68,11 +68,8 @@ class HoppersWebService(object):
     @cherrypy.expose
     def index(self):
         print('index')
-        print(str(path))
-        if not path:
-            index_file = os.path.abspath(os.getcwd()+'\index.html')
-        else:
-            index_file = os.path.abspath(path + 'index.html')
+        print(db_conf.settings['static']['path'])
+        index_file = os.path.abspath(db_conf.settings['static']['path'] + 'index.html')
         f = open( index_file, 'r' )
         return f.read()
 
@@ -93,7 +90,7 @@ if __name__ == '__main__':
             },
             '/': {
                 'tools.sessions.on': True,
-                'tools.staticdir.root': os.path.abspath(os.getcwd())
+                'tools.staticdir.root': os.path.abspath(db_conf.settings['static']['path'])
             }
         }, )
     cherrypy.engine.start()
