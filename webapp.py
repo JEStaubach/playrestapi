@@ -68,7 +68,7 @@ class HoppersWebService(object):
     @cherrypy.expose
     def index(self):
         print('index')
-        print(path)
+        print(str(path))
         if not path:
             index_file = os.path.abspath(os.getcwd()+'\index.html')
         else:
