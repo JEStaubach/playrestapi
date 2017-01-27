@@ -73,11 +73,7 @@ class HoppersWebService(object):
         return f.read()
 
     @cherrypy.expose
-    def index(self):
-        return self.serve_index()
-
-    @cherrypy.expose
-    def hoppers(self):
+    def myfunc(self):
         return self.serve_index()
 
 if __name__ == '__main__':
@@ -97,6 +93,11 @@ if __name__ == '__main__':
             '/hoppers/paddles': {
                 'request.dispatch': cherrypy.dispatch.MethodDispatcher()
             },
+            '/': {
+                'tools.staticdir.on': True,
+                'tools.staticdir.dir': db_conf.settings['static']['path'],
+                'tools.staticdir.index': 'index.html',
+            }
         }, )
     cherrypy.engine.start()
     cherrypy.engine.block()
