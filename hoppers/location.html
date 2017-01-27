@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Location</title>
+
+    <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+    <script>
+        function postNewLocation() {
+            value = $('#location_name').val();
+            console.log(value);
+            data = { 'location_name': value };
+            console.log(data);
+            $.ajax({
+                url:         'http://127.0.0.1:8080/hoppers/rest/location/',
+                type:        "POST",
+                contentType: "application/json;",
+                data:        JSON.stringify(data),
+                dataType:    "json",
+                success:     function (msg) {
+                    alert('Success');
+                },
+                error:       function (err){
+                    alert('Error');
+                }
+            });
+        }
+    </script>
+
+</head>
+
+<body>
+    <h1>Location</h1>
+    <form onsubmit="postNewLocation()">
+        <p>Location Name: <input type="text" name="location_name" id="location_name"/></p>
+        <input type="submit" value="Add"/>
+    </form>
+</body>
+
+</html>

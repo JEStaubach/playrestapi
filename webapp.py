@@ -22,27 +22,26 @@ def get_list(list_name, params):
 
     print(db_conf.settings['DB']['db_user'] + '$' + db_conf.settings['DB']['db_name'])
 
-    return_vals = OrderedDict()
+    return_vals = []
 
     cnx = mysql.connector.connect(user=db_conf.settings['DB']['db_user'],
                                   password=db_conf.settings['DB']['db_pass'],
                                   host=db_conf.settings['DB']['db_host'],
                                   database=db_conf.settings['DB']['db_user'] + '$' + db_conf.settings['DB'][
                                       'db_name'])
-    cursor = cnx.cursor()
-
-    query = ("SELECT * FROM " + list_name + "_tbl")
-
+    cursor = cnx.cursor(dictionary=True)
+    query = ("SELECT * FROM " + list_name + "s_tbl")
     cursor.execute(query)
 
-    query_result = ''
-    for (participant_name) in cursor:
-        query_result += '\n' + str(participant_name)
+    for row in cursor:
+        return_vals.append(dict(row))
+        print(str(row[list_name + '_id']) + ' ' + str(row[list_name + '_name']))
 
     cursor.close()
     cnx.close()
 
-    return_vals['test1'] = 'Hello World' + query_result
+    print(str(return_vals))
+
     return return_vals
 
 
@@ -56,8 +55,12 @@ class HoppersWebService(object):
         if args[0] == 'hoppers' and args[1] == 'rest':
             return json.dumps(get_list(args[2], args[3:]))
 
-    def POST(self, **kwargs):
-        return 'POST:/hoppers/' + str(kwargs)
+    def POST(self, *args):
+        print('POST '+str(args))
+        rawData = cherrypy.request.body.read(int(cherrypy.request.headers['Content-Length']))
+        b = json.loads(rawData)
+        print('b: '+str(b))
+        return 'POST:/hoppers/' + str(args)
 
     def PUT(self, **kwargs):
         return 'PUT:/hoppers/' + str(kwargs)
