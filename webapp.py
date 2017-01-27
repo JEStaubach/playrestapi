@@ -1,17 +1,10 @@
 import cherrypy
-import os
 import json
 from collections import OrderedDict
-from configparser import ConfigParser
 import mysql.connector
 import db_conf
 import sys
 import atexit
-
-#
-# import os.path
-# import getpass
-# from builtins import input
 
 
 sys.stdout = sys.stderr
@@ -21,20 +14,6 @@ cherrypy.config.update({'environment': 'embedded'})
 if cherrypy.__version__.startswith('3.0') and cherrypy.engine.state == 0:
     cherrypy.engine.start(blocking=False)
     atexit.register(cherrypy.engine.stop)
-
-
-class DBConfig:
-    settings = {}
-
-    def __init__(self, config_file='..\db.cfg'):
-        if os.path.isfile(config_file):
-            config = ConfigParser()
-            config.readfp(open(config_file))
-            for section in config.sections():
-                self.settings[section] = {}
-                for option in config.options(section):
-                    self.settings[section][option] = config.get(section, option)
-
 
 def get_list(list_name, params):
     print('get_list list:{} params:{}'.format(str(list_name), str(params)))
@@ -47,11 +26,11 @@ def get_list(list_name, params):
     cnx = mysql.connector.connect(user=db_conf.settings['DB']['db_user'],
                                   password=db_conf.settings['DB']['db_pass'],
                                   host=db_conf.settings['DB']['db_host'],
-                                  database=db_conf.settings['DB']['db_user'] + '$' + db_conf.settings['DB']['db_name'])
+                                  database=db_conf.settings['DB']['db_user'] + '$' + db_conf.settings['DB'][
+                                      'db_name'])
     cursor = cnx.cursor()
 
-    query = ("SELECT * FROM " + list_name + "_tbl" )
-
+    query = ("SELECT * FROM " + list_name + "_tbl")
 
     cursor.execute(query)
 
@@ -85,15 +64,6 @@ class HoppersWebService(object):
         return 'DELETE:/hoppers/' + str(kwargs)
 
 if __name__ == '__main__':
-    # db_conf = DBConfig()
-    # if not 'DB' in db_conf.settings.keys():
-    #     db_conf.settings['DB'] = {}
-    # if not 'db_name' in db_conf.settings['DB'].keys():
-    #     db_conf.settings['DB']['db_name'] = input('db_name:')
-    # if not 'db_user' in db_conf.settings['DB'].keys():
-    #     db_conf.settings['DB']['db_user'] = input('db_user:')
-    # if not 'db_pass' in db_conf.settings['DB'].keys():
-    #     db_conf.settings['DB']['db_pass'] = getpass.getpass('Password:')
     print("name {}".format(db_conf.settings['DB']['db_name']))
     print("user {}".format(db_conf.settings['DB']['db_user']))
     cherrypy.tree.mount(
