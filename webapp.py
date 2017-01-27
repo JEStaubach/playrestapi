@@ -52,9 +52,9 @@ class HoppersWebService(object):
     def GET(self, *args):
         print('GET:'+str(args))
         if not args:
-            args = [None]
-        if args[0] == 'hoppers':
-            return json.dumps(get_list(args[1], args[2:]))
+            args = [None, None]
+        if args[0] == 'hoppers' and args[1] == 'rest':
+            return json.dumps(get_list(args[2], args[3:]))
 
     def POST(self, **kwargs):
         return 'POST:/hoppers/' + str(kwargs)
@@ -84,13 +84,7 @@ if __name__ == '__main__':
         HoppersWebService(),
         '/',
         {
-            '/hoppers/participants': {
-                'request.dispatch': cherrypy.dispatch.MethodDispatcher()
-            },
-            '/hoppers/boats': {
-                'request.dispatch': cherrypy.dispatch.MethodDispatcher()
-            },
-            '/hoppers/paddles': {
+            '/hoppers/rest': {
                 'request.dispatch': cherrypy.dispatch.MethodDispatcher()
             },
             '/': {
