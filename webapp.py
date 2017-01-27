@@ -65,14 +65,20 @@ class HoppersWebService(object):
     def DELETE(self, **kwargs):
         return 'DELETE:/hoppers/' + str(kwargs)
 
-    @cherrypy.expose
-    def index(self):
+    def serve_index(self):
         print('index')
         print(db_conf.settings['static']['path'])
         index_file = os.path.abspath(db_conf.settings['static']['path'] + 'index.html')
         f = open( index_file, 'r' )
         return f.read()
 
+    @cherrypy.expose
+    def index(self):
+        return self.serve_index()
+
+    @cherrypy.expose
+    def hoppers(self):
+        return self.serve_index()
 
 if __name__ == '__main__':
     print("name {}".format(db_conf.settings['DB']['db_name']))
@@ -88,10 +94,9 @@ if __name__ == '__main__':
             '/hoppers/boats': {
                 'request.dispatch': cherrypy.dispatch.MethodDispatcher()
             },
-            '/': {
-                'tools.sessions.on': True,
-                'tools.staticdir.root': os.path.abspath(db_conf.settings['static']['path'])
-            }
+            '/hoppers/paddles': {
+                'request.dispatch': cherrypy.dispatch.MethodDispatcher()
+            },
         }, )
     cherrypy.engine.start()
     cherrypy.engine.block()
