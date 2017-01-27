@@ -5,9 +5,10 @@ import mysql.connector
 import db_conf
 import sys
 import atexit
+import os
+import os.path
 
-
-sys.stdout = sys.stderr
+#sys.stdout = sys.stderr
 cherrypy.config.update({'environment': 'embedded'})
 
 
@@ -49,10 +50,11 @@ class HoppersWebService(object):
     exposed = True
 
     def GET(self, *args):
-        print('GET:/hoppers/'+str(args))
+        print('GET:'+str(args))
         if not args:
             args = [None]
-        return json.dumps(get_list(args[0], args[1:]))
+        if args[0] == 'hoppers':
+            return json.dumps(get_list(args[1], args[2:]))
 
     def POST(self, **kwargs):
         return 'POST:/hoppers/' + str(kwargs)
@@ -63,26 +65,36 @@ class HoppersWebService(object):
     def DELETE(self, **kwargs):
         return 'DELETE:/hoppers/' + str(kwargs)
 
+    @cherrypy.expose
+    def index(self):
+        print('index')
+        print(path)
+        if not path:
+            index_file = os.path.abspath(os.getcwd()+'\index.html')
+        else:
+            index_file = os.path.abspath(path + 'index.html')
+        f = open( index_file, 'r' )
+        return f.read()
+
+
 if __name__ == '__main__':
     print("name {}".format(db_conf.settings['DB']['db_name']))
     print("user {}".format(db_conf.settings['DB']['db_user']))
+    path = None
     cherrypy.tree.mount(
         HoppersWebService(),
-        '/hoppers',
+        '/',
         {
-            '/': {
+            '/hoppers/participants': {
                 'request.dispatch': cherrypy.dispatch.MethodDispatcher()
             },
+            '/hoppers/boats': {
+                'request.dispatch': cherrypy.dispatch.MethodDispatcher()
+            },
+            '/': {
+                'tools.sessions.on': True,
+                'tools.staticdir.root': os.path.abspath(os.getcwd())
+            }
         }, )
-    #     cherrypy.tree.mount(
-    #         Root(),
-    #         '/',
-    #         {
-    #             '/': {
-    #                 'tools.sessions.on': True,
-    #                 'tools.staticdir.root': os.path.abspath(os.getcwd())
-    #             }
-    #         }
-    #     )
     cherrypy.engine.start()
     cherrypy.engine.block()
