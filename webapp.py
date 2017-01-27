@@ -1,16 +1,26 @@
 import cherrypy
 import os
 import json
-import getpass
 from collections import OrderedDict
 from configparser import ConfigParser
-from builtins import input
 import mysql.connector
 import db_conf
+import sys
+import atexit
 
 #
-# import sys
 # import os.path
+# import getpass
+# from builtins import input
+
+
+sys.stdout = sys.stderr
+cherrypy.config.update({'environment': 'embedded'})
+
+
+if cherrypy.__version__.startswith('3.0') and cherrypy.engine.state == 0:
+    cherrypy.engine.start(blocking=False)
+    atexit.register(cherrypy.engine.stop)
 
 
 class DBConfig:
@@ -34,33 +44,36 @@ def get_list(list_name, params):
 
     return_vals = OrderedDict()
 
-    # cnx = mysql.connector.connect(user=db_conf.settings['DB']['db_user'],
-    #                               password=db_conf.settings['DB']['db_pass'],
-    #                               host=db_conf.settings['DB']['db_host'],
-    #                               database=db_conf.settings['DB']['db_user'] + '$' + db_conf.settings['DB']['db_name'])
-    # cursor = cnx.cursor()
-    #
-    # query = ("SELECT * FROM " + list_name + "_tbl" )
-    #
-    #
-    # cursor.execute(query)
-    #
-    # for (participant_name) in cursor:
-    #     print("{}".format(participant_name))
-    #
-    # cursor.close()
-    # cnx.close()
+    cnx = mysql.connector.connect(user=db_conf.settings['DB']['db_user'],
+                                  password=db_conf.settings['DB']['db_pass'],
+                                  host=db_conf.settings['DB']['db_host'],
+                                  database=db_conf.settings['DB']['db_user'] + '$' + db_conf.settings['DB']['db_name'])
+    cursor = cnx.cursor()
 
-    return_vals['test1'] = 'Hello World'
+    query = ("SELECT * FROM " + list_name + "_tbl" )
+
+
+    cursor.execute(query)
+
+    query_result = ''
+    for (participant_name) in cursor:
+        query_result += '\n' + str(participant_name)
+
+    cursor.close()
+    cnx.close()
+
+    return_vals['test1'] = 'Hello World' + query_result
     return return_vals
+
 
 class HoppersWebService(object):
     exposed = True
-    def GET(self,*args):
+
+    def GET(self, *args):
         print('GET:/hoppers/'+str(args))
         if not args:
             args = [None]
-        return json.dumps(get_list(args[0],args[1:]))
+        return json.dumps(get_list(args[0], args[1:]))
 
     def POST(self, **kwargs):
         return 'POST:/hoppers/' + str(kwargs)
