@@ -9,7 +9,7 @@ import os
 import os.path
 
 #sys.stdout = sys.stderr
-cherrypy.config.update({'environment': 'embedded'})
+#cherrypy.config.update({'environment': 'embedded'})
 
 
 if cherrypy.__version__.startswith('3.0') and cherrypy.engine.state == 0:
@@ -49,27 +49,35 @@ class HoppersWebService(object):
     exposed = True
 
     def GET(self, *args):
-        print('GET:'+str(args))
+        print('GET:'+str(args)+cherrypy.request.scheme)
         if not args:
             args = [None, None]
         if args[0] == 'hoppers' and args[1] == 'rest':
-            return json.dumps(get_list(args[2], args[3:]))
+            return json.dumps(get_list(args[2], args[3:]) + cherrypy.request.scheme)
 
     def POST(self, *args):
-        print('POST '+str(args))
+        print('POST '+str(args)+cherrypy.request.scheme)
         rawData = cherrypy.request.body.read(int(cherrypy.request.headers['Content-Length']))
         b = json.loads(rawData)
-        print('b: '+str(b))
-        return 'POST:/hoppers/' + str(args)
+        print('post data: '+str(b))
+        return json.dumps('POST:/hoppers/' + str(args) + cherrypy.request.scheme)
 
-    def PUT(self, **kwargs):
-        return 'PUT:/hoppers/' + str(kwargs)
+    def PUT(self, *args):
+        print('PUT ' + str(args)+cherrypy.request.scheme)
+        rawData = cherrypy.request.body.read(int(cherrypy.request.headers['Content-Length']))
+        b = json.loads(rawData)
+        print('put data: ' + str(b))
+        return json.dumps('PUT:/hoppers/' + str(args) + cherrypy.request.scheme)
 
-    def DELETE(self, **kwargs):
-        return 'DELETE:/hoppers/' + str(kwargs)
+    def DELETE(self, *args):
+        print('DELETE ' + str(args)+cherrypy.request.scheme)
+        # rawData = cherrypy.request.body.read(int(cherrypy.request.headers['Content-Length']))
+        # b = json.loads(rawData)
+        # print('delete data: ' + str(b))
+        return json.dumps('DELETE:/hoppers/' + str(args) + cherrypy.request.scheme)
 
     def serve_index(self):
-        print('index')
+        print('index'+cherrypy.request.scheme)
         print(db_conf.settings['static']['path'])
         index_file = os.path.abspath(db_conf.settings['static']['path'] + 'index.html')
         f = open( index_file, 'r' )
@@ -77,6 +85,7 @@ class HoppersWebService(object):
 
     @cherrypy.expose
     def myfunc(self):
+        print('myfunc'++cherrypy.request.scheme)
         return self.serve_index()
 
 if __name__ == '__main__':
@@ -92,9 +101,12 @@ if __name__ == '__main__':
             },
             '/': {
                 'tools.staticdir.on': True,
-                'tools.staticdir.dir': db_conf.settings['static']['path'],
+                'tools.staticdir.dir': os.path.abspath(db_conf.settings['static']['path']),
                 'tools.staticdir.index': 'index.html',
             }
         }, )
+    cherrypy.server.ssl_module = 'builtin'
+    cherrypy.server.ssl_certificate = "cert.pem"
+    cherrypy.server.ssl_private_key = "privkey.pem"
     cherrypy.engine.start()
     cherrypy.engine.block()
