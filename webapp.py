@@ -69,7 +69,6 @@ def update_row(new_data, list_name, params):
                                   host=db_conf.settings['DB']['db_host'],
                                   database=db_conf.settings['DB']['db_user'] + '$' + db_conf.settings['DB']['db_name'])
     cursor = cnx.cursor(dictionary=True)
-
     cmd = "UPDATE " + list_name + "_tbl SET " + ','.join([key + " = '" + new_data[key] + "'" for key in new_data.keys()]) + " WHERE " + list_name + "_tbl." + list_name[:-1] + "_id = " + params[0]
     print(cmd)
     query = cmd
