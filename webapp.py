@@ -7,10 +7,12 @@ import sys
 import atexit
 import os
 import os.path
+from oauth2client import client, crypt
 
 #sys.stdout = sys.stderr
 #cherrypy.config.update({'environment': 'embedded'})
 
+client_id = '105600165694-08orfb5k9o0tit237hnohila4m694ufu.apps.googleusercontent.com'
 
 if cherrypy.__version__.startswith('3.0') and cherrypy.engine.state == 0:
     cherrypy.engine.start(blocking=False)
@@ -79,6 +81,43 @@ def update_row(new_data, list_name, params):
     return {'method': 'delete', 'status': 'success'}
 
 
+def signin(in_data):
+    print('signin')
+    token = in_data['token']
+    try:
+        idinfo = client.verify_id_token(token, client_id)
+        # Or, if multiple clients access the backend server:
+        # idinfo = client.verify_id_token(token, None)
+        # if idinfo['aud'] not in [CLIENT_ID_1, CLIENT_ID_2, CLIENT_ID_3]:
+        #    raise crypt.AppIdentityError("Unrecognized client.")
+        if idinfo['iss'] not in ['accounts.google.com', 'https://accounts.google.com']:
+            raise crypt.AppIdentityError("Wrong issuer.")
+            # If auth request is from a G Suite domain:
+            # if idinfo['hd'] != GSUITE_DOMAIN_NAME:
+            #    raise crypt.AppIdentityError("Wrong hosted domain.")
+    except crypt.AppIdentityError:
+        # Invalid token
+        return {'method': 'post', 'status': 'signin decrypt failed'}
+    email = idinfo['email']
+    print(email)
+    if idinfo['aud'] != client_id:
+        return {'method': 'post', 'status': 'signin client id failed'}
+    return_vals = []
+    cnx = mysql.connector.connect(user=db_conf.settings['DB']['db_user'],
+                                  password=db_conf.settings['DB']['db_pass'],
+                                  host=db_conf.settings['DB']['db_host'],
+                                  database=db_conf.settings['DB']['db_user'] + '$' + db_conf.settings['DB']['db_name'])
+    cursor = cnx.cursor(dictionary=True)
+    query = ("SELECT * FROM users WHERE user_email = '" + email + "'")
+    cursor.execute(query)
+    for row in cursor:
+        return_vals.append(dict(row))
+    cursor.close()
+    cnx.close()
+    if len(return_vals) > 0:
+        return {'method': 'post', 'status': 'success'}
+    return {'method': 'post', 'status': 'signin email not registered'}
+
 
 class HoppersWebService(object):
     exposed = True
@@ -97,6 +136,8 @@ class HoppersWebService(object):
         print('post data: '+str(new_data))
         if args[0] == 'hoppers' and args[1] == 'rest':
             return json.dumps(create_row(new_data, args[2]))
+        if args[0] == 'hoppers' and args[1] == 'tokensignin':
+            return json.dumps(signin(new_data))
 
     def PUT(self, *args):
         print('PUT ' + str(args)+cherrypy.request.scheme)
@@ -120,7 +161,7 @@ class HoppersWebService(object):
 
     @cherrypy.expose
     def myfunc(self):
-        print('myfunc'++cherrypy.request.scheme)
+        print('myfunc'+cherrypy.request.scheme)
         return self.serve_index()
 
 if __name__ == '__main__':
@@ -132,6 +173,9 @@ if __name__ == '__main__':
         '/',
         {
             '/hoppers/rest': {
+                'request.dispatch': cherrypy.dispatch.MethodDispatcher()
+            },
+            '/hoppers/tokensignin': {
                 'request.dispatch': cherrypy.dispatch.MethodDispatcher()
             },
             '/': {

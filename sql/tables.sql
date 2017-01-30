@@ -7,6 +7,7 @@ DROP VIEW boats;
 DROP VIEW paddles;
 DROP VIEW shafts;
 DROP VIEW trailers;
+DROP VIEW users;
 
 DROP TABLE participants_tbl;
 DROP TABLE skilllevels_tbl;
@@ -17,6 +18,7 @@ DROP TABLE boats_tbl;
 DROP TABLE paddles_tbl;
 DROP TABLE shafts_tbl;
 DROP TABLE trailers_tbl;
+DROP TABLE users_tbl;
 
 CREATE TABLE skilllevels_tbl (
 	skilllevel_id INT NOT NULL AUTO_INCREMENT,
@@ -129,3 +131,11 @@ CREATE TABLE trailers_tbl (
 );
 
 CREATE VIEW trailers AS SELECT * FROM trailers_tbl;
+
+CREATE TABLE users_tbl (
+    user_id INT NOT NULL AUTO_INCREMENT,
+    user_email VARCHAR(256) NOT NULL,
+    PRIMARY KEY ( user_id )
+);
+
+CREATE VIEW users AS SELECT * FROM users_tbl;
