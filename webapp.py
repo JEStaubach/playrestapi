@@ -8,6 +8,7 @@ import atexit
 import os
 import os.path
 from oauth2client import client, crypt
+import urllib2
 
 #sys.stdout = sys.stderr
 #cherrypy.config.update({'environment': 'embedded'})
@@ -19,7 +20,7 @@ if cherrypy.__version__.startswith('3.0') and cherrypy.engine.state == 0:
     atexit.register(cherrypy.engine.stop)
 
 
-def get_list(list_name, params):
+def get_list(list_name):
     return_vals = []
     cnx = mysql.connector.connect(user=db_conf.settings['DB']['db_user'],
                                   password=db_conf.settings['DB']['db_pass'],
@@ -115,8 +116,57 @@ def signin(in_data):
     cursor.close()
     cnx.close()
     if len(return_vals) > 0:
+        login_succeeded(email)
         return {'method': 'post', 'status': 'success'}
-    return {'method': 'post', 'status': 'signin email not registered'}
+    else:
+        login_failed(email)
+        return {'method': 'post', 'status': 'signin email not registered'}
+
+
+def login_failed(email):
+    cnx = mysql.connector.connect(user=db_conf.settings['DB']['db_user'],
+                                  password=db_conf.settings['DB']['db_pass'],
+                                  host=db_conf.settings['DB']['db_host'],
+                                  database=db_conf.settings['DB']['db_user'] + '$' + db_conf.settings['DB']['db_name'])
+    cursor = cnx.cursor(dictionary=True)
+    query = ("SELECT * FROM failedlogins WHERE failedlogin_email = '" + email + "'")
+    cursor.execute(query)
+    rows = []
+    for row in cursor:
+        rows.append(dict(row))
+    cursor.close()
+    cnx.close()
+    fail_count = 1
+    fail_id = None
+    if len(rows) > 0:
+        fail_count = rows[0]['failedlogin_count'] + 1
+        fail_id = rows[0]['failedlogin_id']
+    cnx = mysql.connector.connect(user=db_conf.settings['DB']['db_user'],
+                                  password=db_conf.settings['DB']['db_pass'],
+                                  host=db_conf.settings['DB']['db_host'],
+                                  database=db_conf.settings['DB']['db_user'] + '$' + db_conf.settings['DB']['db_name'])
+    cursor = cnx.cursor(dictionary=True)
+    if fail_count == 1:
+        query = "INSERT INTO failedlogins_tbl ( failedlogin_email, failedlogin_count, failedlogin_lastdate, failedlogin_lasttime ) VALUES ( '" + email + "'," + str(fail_count) + ", CURDATE(), CURTIME() )"
+    else:
+        query = "UPDATE failedlogins_tbl SET failedlogin_count=" + str(fail_count) + ", failedlogin_lastdate=CURDATE(), failedlogin_lasttime=CURTIME() WHERE failedlogin_id = " + str(fail_id)
+    cursor.execute(query)
+    cursor.close()
+    cnx.commit()
+    cnx.close()
+
+
+def login_succeeded(email):
+    cnx = mysql.connector.connect(user=db_conf.settings['DB']['db_user'],
+                                  password=db_conf.settings['DB']['db_pass'],
+                                  host=db_conf.settings['DB']['db_host'],
+                                  database=db_conf.settings['DB']['db_user'] + '$' + db_conf.settings['DB']['db_name'])
+    cursor = cnx.cursor(dictionary=True)
+    query = "INSERT INTO logins_tbl ( login_email, login_date, login_time ) VALUES ( '" + email + "', CURDATE(), CURTIME() )"
+    cursor.execute(query)
+    cursor.close()
+    cnx.commit()
+    cnx.close()
 
 
 class HoppersWebService(object):
@@ -126,8 +176,10 @@ class HoppersWebService(object):
         print('GET:'+str(args)+cherrypy.request.scheme)
         if not args:
             args = [None, None]
+        if args[0] == 'hoppers' and args[1] == 'manage':
+            return self.manage()
         if args[0] == 'hoppers' and args[1] == 'rest':
-            return json.dumps(get_list(args[2], args[3:]))
+            raise cherrypy.HTTPRedirect('/hoppers/manage')
 
     def POST(self, *args):
         print('POST '+str(args)+cherrypy.request.scheme)
@@ -141,11 +193,15 @@ class HoppersWebService(object):
 
     def PUT(self, *args):
         print('PUT ' + str(args)+cherrypy.request.scheme)
-        rawData = cherrypy.request.body.read(int(cherrypy.request.headers['Content-Length']))
-        new_data = json.loads(rawData)
-        print('put data: ' + str(new_data))
         if args[0] == 'hoppers' and args[1] == 'rest':
-            return json.dumps(update_row(new_data, args[2], args[3:]))
+            if len(args) > 3:
+                rawData = cherrypy.request.body.read(int(cherrypy.request.headers['Content-Length']))
+                new_data = json.loads(rawData)
+                print('put data: ' + str(new_data))
+                return json.dumps(update_row(new_data, args[2], args[3:]))
+            else:
+                # A put without an index treated as a GET
+                return json.dumps(get_list(args[2]))
 
     def DELETE(self, *args):
         print('DELETE ' + str(args)+cherrypy.request.scheme)
@@ -159,10 +215,10 @@ class HoppersWebService(object):
         f = open( index_file, 'r' )
         return f.read()
 
-    @cherrypy.expose
-    def myfunc(self):
-        print('myfunc'+cherrypy.request.scheme)
-        return self.serve_index()
+    def manage(self):
+        index_file = os.path.abspath(db_conf.settings['static']['path'] + 'manage.html')
+        f = open( index_file, 'r' )
+        return f.read()
 
 if __name__ == '__main__':
     print("name {}".format(db_conf.settings['DB']['db_name']))
@@ -176,6 +232,9 @@ if __name__ == '__main__':
                 'request.dispatch': cherrypy.dispatch.MethodDispatcher()
             },
             '/hoppers/tokensignin': {
+                'request.dispatch': cherrypy.dispatch.MethodDispatcher()
+            },
+            '/hoppers/manage': {
                 'request.dispatch': cherrypy.dispatch.MethodDispatcher()
             },
             '/': {

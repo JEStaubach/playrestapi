@@ -8,6 +8,8 @@ DROP VIEW paddles;
 DROP VIEW shafts;
 DROP VIEW trailers;
 DROP VIEW users;
+DROP VIEW failedlogins;
+DROP VIEW logins;
 
 DROP TABLE participants_tbl;
 DROP TABLE skilllevels_tbl;
@@ -19,6 +21,8 @@ DROP TABLE paddles_tbl;
 DROP TABLE shafts_tbl;
 DROP TABLE trailers_tbl;
 DROP TABLE users_tbl;
+DROP TABLE failedlogins_tbl;
+DROP TABLE logins_tbl;
 
 CREATE TABLE skilllevels_tbl (
 	skilllevel_id INT NOT NULL AUTO_INCREMENT,
@@ -135,7 +139,30 @@ CREATE VIEW trailers AS SELECT * FROM trailers_tbl;
 CREATE TABLE users_tbl (
     user_id INT NOT NULL AUTO_INCREMENT,
     user_email VARCHAR(256) NOT NULL,
+    user_permissions VARCHAR(4) NOT NULL,
     PRIMARY KEY ( user_id )
 );
 
 CREATE VIEW users AS SELECT * FROM users_tbl;
+
+CREATE TABLE failedlogins_tbl (
+    failedlogin_id INT NOT NULL AUTO_INCREMENT,
+    failedlogin_email VARCHAR(256) NOT NULL,
+    failedlogin_count INT NOT NULL,
+    failedlogin_lastdate DATE NOT NULL,
+    failedlogin_lasttime TIME NOT NULL,
+    PRIMARY KEY (failedlogin_id)
+);
+
+CREATE VIEW failedlogins AS SELECT * FROM failedlogins_tbl;
+
+CREATE TABLE logins_tbl (
+    login_id INT NOT NULL AUTO_INCREMENT,
+    login_email VARCHAR(256) NOT NULL,
+    login_date DATE NOT NULL,
+    login_time TIME NOT NULL,
+    PRIMARY KEY (login_id)
+);
+
+CREATE VIEW logins AS SELECT * FROM logins_tbl;
+

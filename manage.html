@@ -1,0 +1,209 @@
+<html lang="en">
+
+
+    <head>
+
+        <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+
+        <meta name="google-signin-scope" content="profile email">
+        <meta name="google-signin-client_id" content="105600165694-08orfb5k9o0tit237hnohila4m694ufu.apps.googleusercontent.com">
+        <script src="https://apis.google.com/js/platform.js" async defer></script>
+
+        <script>
+
+            var id_token = null;
+            var img_url = null;
+
+            function show_content() {
+                $('#unauthorized').css("visibility", "hidden");
+                $('#signin').css("visibility", "hidden");
+                $('#stuff').css("visibility", "visible");
+                $('#user_image').attr('src', img_url);
+                refresh_rows();
+            };
+
+            function hide_content() {
+                $('#unauthorized').css("visibility", "hidden");
+                $('#stuff').css("visibility", "hidden");
+                $('#signin').css("visibility", "visible");
+            };
+
+            function unauthorized() {
+                $('#unauthorized').css("visibility", "visible");
+            };
+
+            function refresh_rows() {
+                data = {'token': id_token};
+                console.log('fetching rows');
+                $.ajax({
+                    url:         'https://localhost:8080/hoppers/rest/locations',
+                    type:        "PUT",
+                    contentType: "application/json;",
+                    data:        JSON.stringify(data),
+                    dataType:    "json",
+                    success:     function (msg) {
+                        json_response = msg;
+                        //json_response = jQuery.parseJSON(msg);
+                        $('#rows_holder').empty();
+                        $('#rows_holder').append( '<table id="rows_table"></table>' );
+                        for (var i = 0; i < json_response.length; i++) {
+                            console.log(json_response[i]);
+                            $('#rows_table').append('<tr id="rows_table_' + i.toString() + '"></tr>');
+                            for (var key in json_response[i]) {
+                                if (json_response[i].hasOwnProperty(key)) {
+                                    $('#rows_table_'+i.toString()).append('<td>'+json_response[i][key].toString()+'</td>');
+                                    console.log(key + " -> " + json_response[i][key]);
+                                }
+                            }
+                            $('#rows_table_'+i.toString()).append('<td><a href="#" id="rows_table_edit' + i.toString() + '_id">Edit</a></td>');
+                            $('#rows_table_edit'+i.toString()+'_id').click({p1: json_response, p2: i}, function(event) {
+                                value = $('#location_name').val();
+                                data = { 'location_name': value };
+                                $.ajax({
+                                    url:         'https://localhost:8080/hoppers/rest/locations/'+event.data.p1[event.data.p2].location_id.toString(),
+                                    type:        "PUT",
+                                    contentType: "application/json;",
+                                    data:        JSON.stringify(data),
+                                    dataType:    "json",
+                                    success:     function (msg) {
+                                        console.log(msg);
+                                        refresh_rows();
+                                    },
+                                    error:       function (err){
+                                        console.log(err)
+                                        refresh_rows();
+                                    }
+                                });
+                                return false;
+                            });
+                            $('#rows_table_'+i.toString()).append('<td><a href="#" id="rows_table_delete' + i.toString() + '_id">Delete</a></td>');
+                            $('#rows_table_delete'+i.toString()+'_id').click({p1: json_response, p2: i}, function(event) {
+                                value = $('#location_name').val();
+                                data = { 'location_name': value };
+                                $.ajax({
+                                    url:         'https://localhost:8080/hoppers/rest/locations/'+event.data.p1[event.data.p2].location_id.toString(),
+                                    type:        "DELETE",
+                                    contentType: "application/json;",
+                                    success:     function (msg) {
+                                        console.log(msg);
+                                        refresh_rows();
+                                    },
+                                    error:       function (err){
+                                        console.log(err)
+                                        refresh_rows();
+                                    }
+                                });
+                                return false;
+                            });
+                        }
+                    },
+                    error:       function (err){
+                        console.log(err)
+                        alert('GET Error');
+                    }
+                });
+            };
+
+            function onSignIn(googleUser) {
+                // Useful data for your client-side scripts:
+                var profile = googleUser.getBasicProfile();
+                console.log("ID: " + profile.getId()); // Don't send this directly to your server!
+                console.log('Full Name: ' + profile.getName());
+                console.log('Given Name: ' + profile.getGivenName());
+                console.log('Family Name: ' + profile.getFamilyName());
+                img_url = profile.getImageUrl();
+                console.log("Image URL: " + profile.getImageUrl());
+                console.log("Email: " + profile.getEmail());
+
+                // The ID token you need to pass to your backend:
+                id_token = googleUser.getAuthResponse().id_token;
+                console.log("ID Token: " + id_token);
+
+                console.log('signing in');
+                $.ajax({
+                    url:         'https://localhost:8080/hoppers/tokensignin',
+                    type:        "POST",
+                    contentType: "application/json;",
+                    data:        JSON.stringify({'token': id_token}),
+                    dataType:    "json",
+                    success:     function (msg) {
+                        console.log(msg);
+                        if (msg['status'] == 'success') {
+                          show_content();
+                        }
+                        else {
+                          hide_content();
+                          unauthorized();
+                        };
+                    },
+                    error:       function (err){
+                        console.log(err);
+                        hide_content();
+                        unauthorized();
+                    }
+                });
+                return false;
+            };
+
+            $(document).ready(function() {
+
+                $('#signout').click(function() {
+                    var auth2 = gapi.auth2.getAuthInstance();
+                    auth2.signOut().then(function () {
+                    console.log('User signed out.');
+                    hide_content();
+                });
+                    return false;
+                });
+
+                $('#add_button').click(function() {
+                    value = $('#location_name').val();
+                    console.log(value);
+                    data = { 'location_name': value };
+                    console.log(data);
+                    $.ajax({
+                        url:         'https://localhost:8080/hoppers/rest/locations/',
+                        type:        "POST",
+                        contentType: "application/json;",
+                        data:        JSON.stringify(data),
+                        dataType:    "json",
+                        success:     function (msg) {
+                            console.log(msg);
+                            refresh_rows();
+                        },
+                        error:       function (err){
+                            console.log(err)
+                            refresh_rows();
+                        }
+                    });
+                    return false;
+                });
+
+            });
+
+        </script>
+
+    </head>
+
+
+    <body>
+
+        <div id="signin" style="visibility:visible;" class="g-signin2" data-onsuccess="onSignIn" data-theme="dark">
+        </div>
+
+        <div id="stuff" style="visibility:hidden;">
+            <h1>Locations</h1>
+            <div id="rows_holder">
+            </div>
+            <p>Location Name: <input type="text" name="location_name" id="location_name"/><button id="add_button">Add</button></p>
+            <p><img id="user_image"/></p>
+            <a id="signout" href="#">Sign out</a>
+        </div>
+
+        <div id="unauthorized" style="visibility:hidden;">
+            <h1>Unauthorized</h1>
+            <p>User could not be authenticated or is not authorized.</p>
+        </div>
+
+    </body>
+</html>

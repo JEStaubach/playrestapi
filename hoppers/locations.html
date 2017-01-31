@@ -10,8 +10,8 @@
         function refresh_rows() {
             console.log('fetching rows');
             $.ajax({
-                url:         'https://127.0.0.1:8080/hoppers/rest/locations',
-                type:        "GET",
+                url:         'https://localhost:8080/hoppers/rest/locations',
+                type:        "PUT",
                 contentType: "application/json;",
                 success:     function (msg) {
                     json_response = jQuery.parseJSON(msg);
@@ -31,7 +31,7 @@
                             value = $('#location_name').val();
                             data = { 'location_name': value };
                             $.ajax({
-                                url:         'https://127.0.0.1:8080/hoppers/rest/locations/'+event.data.p1[event.data.p2].location_id.toString(),
+                                url:         'https://localhost:8080/hoppers/rest/locations/'+event.data.p1[event.data.p2].location_id.toString(),
                                 type:        "PUT",
                                 contentType: "application/json;",
                                 data:        JSON.stringify(data),
@@ -52,7 +52,7 @@
                             value = $('#location_name').val();
                             data = { 'location_name': value };
                             $.ajax({
-                                url:         'https://127.0.0.1:8080/hoppers/rest/locations/'+event.data.p1[event.data.p2].location_id.toString(),
+                                url:         'https://localhost:8080/hoppers/rest/locations/'+event.data.p1[event.data.p2].location_id.toString(),
                                 type:        "DELETE",
                                 contentType: "application/json;",
                                 success:     function (msg) {
@@ -83,7 +83,7 @@
                 data = { 'location_name': value };
                 console.log(data);
                 $.ajax({
-                    url:         'https://127.0.0.1:8080/hoppers/rest/locations/',
+                    url:         'https://localhost:8080/hoppers/rest/locations/',
                     type:        "POST",
                     contentType: "application/json;",
                     data:        JSON.stringify(data),
