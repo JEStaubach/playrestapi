@@ -15,6 +15,8 @@
             var img_url = null;
 
             function show_content() {
+                $('#notfound').css('visiblity', 'hidden');
+                $('#insufficient').css("visibility", "hidden");
                 $('#unauthorized').css("visibility", "hidden");
                 $('#signin').css("visibility", "hidden");
                 $('#stuff').css("visibility", "visible");
@@ -23,6 +25,8 @@
             };
 
             function hide_content() {
+                $('#notfound').css('visiblity', 'hidden');
+                $('#insufficient').css("visibility", "hidden");
                 $('#unauthorized').css("visibility", "hidden");
                 $('#stuff').css("visibility", "hidden");
                 $('#signin').css("visibility", "visible");
@@ -32,16 +36,26 @@
                 $('#unauthorized').css("visibility", "visible");
             };
 
+            function insufficient_priveleges() {
+                $('#insufficient').css('visibility', 'visible');
+            };
+
+            function notfound() {
+                $('#notfound').css('visibility', 'visible');
+            }
+
             function refresh_rows() {
-                data = {'token': id_token};
                 console.log('fetching rows');
                 $.ajax({
-                    url:         'https://localhost:8080/hoppers/rest/locations',
-                    type:        "PUT",
+                    url:         '/hoppers/rest/locations',
+                    type:        "GET",
                     contentType: "application/json;",
-                    data:        JSON.stringify(data),
                     dataType:    "json",
+                    beforeSend : function( xhr ) {
+                        xhr.setRequestHeader( "Authorization", id_token );
+                    },
                     success:     function (msg) {
+                        console.log(msg);
                         json_response = msg;
                         //json_response = jQuery.parseJSON(msg);
                         $('#rows_holder').empty();
@@ -58,9 +72,9 @@
                             $('#rows_table_'+i.toString()).append('<td><a href="#" id="rows_table_edit' + i.toString() + '_id">Edit</a></td>');
                             $('#rows_table_edit'+i.toString()+'_id').click({p1: json_response, p2: i}, function(event) {
                                 value = $('#location_name').val();
-                                data = { 'location_name': value };
+                                data = { 'location_name': value, 'token': id_token };
                                 $.ajax({
-                                    url:         'https://localhost:8080/hoppers/rest/locations/'+event.data.p1[event.data.p2].location_id.toString(),
+                                    url:         '/hoppers/rest/locations/'+event.data.p1[event.data.p2].location_id.toString(),
                                     type:        "PUT",
                                     contentType: "application/json;",
                                     data:        JSON.stringify(data),
@@ -78,12 +92,12 @@
                             });
                             $('#rows_table_'+i.toString()).append('<td><a href="#" id="rows_table_delete' + i.toString() + '_id">Delete</a></td>');
                             $('#rows_table_delete'+i.toString()+'_id').click({p1: json_response, p2: i}, function(event) {
-                                value = $('#location_name').val();
-                                data = { 'location_name': value };
+                                data = { 'token': id_token };
                                 $.ajax({
-                                    url:         'https://localhost:8080/hoppers/rest/locations/'+event.data.p1[event.data.p2].location_id.toString(),
+                                    url:         '/hoppers/rest/locations/'+event.data.p1[event.data.p2].location_id.toString(),
                                     type:        "DELETE",
                                     contentType: "application/json;",
+                                    data:        JSON.stringify(data),
                                     success:     function (msg) {
                                         console.log(msg);
                                         refresh_rows();
@@ -99,7 +113,12 @@
                     },
                     error:       function (err){
                         console.log(err)
-                        alert('GET Error');
+                        if ( err['status'] == 403 ) {
+                            insufficient_priveleges();
+                        };
+                        if ( err['status'] == 404 ) {
+                            notfound();
+                        }
                     }
                 });
             };
@@ -121,20 +140,16 @@
 
                 console.log('signing in');
                 $.ajax({
-                    url:         'https://localhost:8080/hoppers/tokensignin',
-                    type:        "POST",
+                    url:         '/hoppers/tokensignin',
+                    type:        "GET",
                     contentType: "application/json;",
-                    data:        JSON.stringify({'token': id_token}),
                     dataType:    "json",
+                    beforeSend : function( xhr ) {
+                        xhr.setRequestHeader( "Authorization", id_token );
+                    },
                     success:     function (msg) {
                         console.log(msg);
-                        if (msg['status'] == 'success') {
-                          show_content();
-                        }
-                        else {
-                          hide_content();
-                          unauthorized();
-                        };
+                        show_content();
                     },
                     error:       function (err){
                         console.log(err);
@@ -159,10 +174,10 @@
                 $('#add_button').click(function() {
                     value = $('#location_name').val();
                     console.log(value);
-                    data = { 'location_name': value };
+                    data = { 'location_name': value, 'token': id_token };
                     console.log(data);
                     $.ajax({
-                        url:         'https://localhost:8080/hoppers/rest/locations/',
+                        url:         '/hoppers/rest/locations/',
                         type:        "POST",
                         contentType: "application/json;",
                         data:        JSON.stringify(data),
@@ -203,6 +218,16 @@
         <div id="unauthorized" style="visibility:hidden;">
             <h1>Unauthorized</h1>
             <p>User could not be authenticated or is not authorized.</p>
+        </div>
+
+        <div id="insufficient" style="visibility:hidden;">
+            <h1>Insufficient Priveleges</h1>
+            <p>User does not have sufficient privelges.</p>
+        </div>
+
+        <div id="notfound" style="visibility:hidden;">
+            <h1>Not found</h1>
+            <p>Resource not found.</p>
         </div>
 
     </body>

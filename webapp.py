@@ -67,6 +67,7 @@ def create_row(new_data, list_name):
 
 
 def update_row(new_data, list_name, params):
+    new_data.pop('token', None)
     cnx = mysql.connector.connect(user=db_conf.settings['DB']['db_user'],
                                   password=db_conf.settings['DB']['db_pass'],
                                   host=db_conf.settings['DB']['db_host'],
@@ -82,27 +83,18 @@ def update_row(new_data, list_name, params):
     return {'method': 'delete', 'status': 'success'}
 
 
-def signin(in_data):
+def authorize(token):
     print('signin')
-    token = in_data['token']
     try:
-        idinfo = client.verify_id_token(token, client_id)
-        # Or, if multiple clients access the backend server:
-        # idinfo = client.verify_id_token(token, None)
-        # if idinfo['aud'] not in [CLIENT_ID_1, CLIENT_ID_2, CLIENT_ID_3]:
-        #    raise crypt.AppIdentityError("Unrecognized client.")
+        idinfo = client.verify_id_token(token, None)
+        if idinfo['aud'] not in [client_id]:
+           raise crypt.AppIdentityError("Unrecognized client.")
         if idinfo['iss'] not in ['accounts.google.com', 'https://accounts.google.com']:
             raise crypt.AppIdentityError("Wrong issuer.")
-            # If auth request is from a G Suite domain:
-            # if idinfo['hd'] != GSUITE_DOMAIN_NAME:
-            #    raise crypt.AppIdentityError("Wrong hosted domain.")
     except crypt.AppIdentityError:
-        # Invalid token
-        return {'method': 'post', 'status': 'signin decrypt failed'}
+        return {'status': 'signin authentication failed'}
     email = idinfo['email']
     print(email)
-    if idinfo['aud'] != client_id:
-        return {'method': 'post', 'status': 'signin client id failed'}
     return_vals = []
     cnx = mysql.connector.connect(user=db_conf.settings['DB']['db_user'],
                                   password=db_conf.settings['DB']['db_pass'],
@@ -117,10 +109,10 @@ def signin(in_data):
     cnx.close()
     if len(return_vals) > 0:
         login_succeeded(email)
-        return {'method': 'post', 'status': 'success'}
+        return {'status': 'success', 'permissions': return_vals[0]['user_permissions']}
     else:
         login_failed(email)
-        return {'method': 'post', 'status': 'signin email not registered'}
+        return {'status': 'user not found'}
 
 
 def login_failed(email):
@@ -178,35 +170,92 @@ class HoppersWebService(object):
             args = [None, None]
         if args[0] == 'hoppers' and args[1] == 'manage':
             return self.manage()
-        if args[0] == 'hoppers' and args[1] == 'rest':
-            raise cherrypy.HTTPRedirect('/hoppers/manage')
+        elif args[0] == 'hoppers' and args[1] == 'rest':
+            authorization = authorize(cherrypy.request.headers.get('Authorization'))
+            if authorization['status'] == 'success':
+                if 'R' in authorization['permissions']:
+                    return json.dumps(get_list(args[2]))
+                else:
+                    cherrypy.response.status = 403
+                    return json.dumps({'method': 'GET',
+                                       'status': 'Insufficient privileges'})
+            else:
+                cherrypy.response.status = 401
+                return json.dumps({'method': 'GET',
+                                   'status': authorization['status']})
+        elif args[0] == 'hoppers' and args[1] == 'tokensignin':
+            authorization = authorize(cherrypy.request.headers.get('Authorization'))
+            if authorization['status'] == 'success':
+                return json.dumps({'method': 'GET',
+                                   'status': authorization['status']})
+            else:
+                cherrypy.response.status = 401
+                return json.dumps({'method': 'GET',
+                                   'status': authorization['status']})
+        else:
+            cherrypy.response.status = 404
+            return json.dumps({'method': 'GET',
+                               'status': 'Unhandled resource location '+str(args)})
 
     def POST(self, *args):
         print('POST '+str(args)+cherrypy.request.scheme)
         rawData = cherrypy.request.body.read(int(cherrypy.request.headers['Content-Length']))
         new_data = json.loads(rawData)
         print('post data: '+str(new_data))
+        authorization = authorize(new_data['token'])
         if args[0] == 'hoppers' and args[1] == 'rest':
-            return json.dumps(create_row(new_data, args[2]))
-        if args[0] == 'hoppers' and args[1] == 'tokensignin':
-            return json.dumps(signin(new_data))
+            if authorization['status'] == 'success':
+                if 'C' in authorization['permissions']:
+                    return json.dumps(create_row(new_data, args[2]))
+                else:
+                    return json.dumps({'method': 'POST',
+                                       'status': 'Insufficient permissions ' + str(authorization['permissions'])})
+            else:
+                return json.dumps({'method': 'POST',
+                                   'status': authorization['status']})
+        else:
+            return json.dumps({'method': 'POST',
+                               'status': 'Unhandled resource location '+str(args)})
 
     def PUT(self, *args):
         print('PUT ' + str(args)+cherrypy.request.scheme)
+        rawData = cherrypy.request.body.read(int(cherrypy.request.headers['Content-Length']))
+        new_data = json.loads(rawData)
+        print('put data: ' + str(new_data))
+        authorization = authorize(new_data['token'])
         if args[0] == 'hoppers' and args[1] == 'rest':
-            if len(args) > 3:
-                rawData = cherrypy.request.body.read(int(cherrypy.request.headers['Content-Length']))
-                new_data = json.loads(rawData)
-                print('put data: ' + str(new_data))
-                return json.dumps(update_row(new_data, args[2], args[3:]))
+            if authorization['status'] == 'success':
+                if 'U' in authorization['permissions']:
+                    return json.dumps(update_row(new_data, args[2], args[3:]))
+                else:
+                    return json.dumps({'method': 'PUT',
+                                       'status': 'Insufficient permissions ' + str(authorization['permissions'])})
             else:
-                # A put without an index treated as a GET
-                return json.dumps(get_list(args[2]))
+                return json.dumps({'method': 'PUT',
+                                   'status': authorization['status']})
+        else:
+            return json.dumps({'method': 'PUT',
+                               'status': 'Unhandled resource location '+str(args)})
 
     def DELETE(self, *args):
         print('DELETE ' + str(args)+cherrypy.request.scheme)
+        rawData = cherrypy.request.body.read(int(cherrypy.request.headers['Content-Length']))
+        new_data = json.loads(rawData)
+        print('delete data: ' + str(new_data))
+        authorization = authorize(new_data['token'])
         if args[0] == 'hoppers' and args[1] == 'rest':
-            return json.dumps(remove_row(args[2], args[3:]))
+            if authorization['status'] == 'success':
+                if 'D' in authorization['permissions']:
+                    return json.dumps(remove_row(args[2], args[3:]))
+                else:
+                    return json.dumps({'method': 'DELETE',
+                                       'status': 'Insufficient permissions '+str(authorization['permissions'])})
+            else:
+                return json.dumps({'method': 'DELETE',
+                                   'status': authorization['status']})
+        else:
+            return json.dumps({'method': 'DELETE',
+                               'status': 'Unhandled resource location '+str(args)})
 
     def serve_index(self):
         print('index'+cherrypy.request.scheme)
@@ -235,6 +284,9 @@ if __name__ == '__main__':
                 'request.dispatch': cherrypy.dispatch.MethodDispatcher()
             },
             '/hoppers/manage': {
+                'request.dispatch': cherrypy.dispatch.MethodDispatcher()
+            },
+            '/hoppers/bananas': {
                 'request.dispatch': cherrypy.dispatch.MethodDispatcher()
             },
             '/': {
