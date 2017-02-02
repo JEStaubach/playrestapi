@@ -9,6 +9,7 @@ import os
 import os.path
 from oauth2client import client, crypt
 import urllib2
+from urlparse import urlparse
 
 #sys.stdout = sys.stderr
 #cherrypy.config.update({'environment': 'embedded'})
@@ -20,7 +21,8 @@ if cherrypy.__version__.startswith('3.0') and cherrypy.engine.state == 0:
     atexit.register(cherrypy.engine.stop)
 
 
-def get_list(list_name):
+def get_list(args):
+    list_name = args[0]
     return_vals = []
     cnx = mysql.connector.connect(user=db_conf.settings['DB']['db_user'],
                                   password=db_conf.settings['DB']['db_pass'],
@@ -36,22 +38,27 @@ def get_list(list_name):
     return return_vals
 
 
-def remove_row(list_name, params):
+def remove_row(args):
+    list_name = args[0]
+    id = args[1]
     cnx = mysql.connector.connect(user=db_conf.settings['DB']['db_user'],
                                   password=db_conf.settings['DB']['db_pass'],
                                   host=db_conf.settings['DB']['db_host'],
                                   database=db_conf.settings['DB']['db_user'] + '$' + db_conf.settings['DB']['db_name'])
     cursor = cnx.cursor(dictionary=True)
-    cmd = "DELETE FROM " + list_name + "_tbl WHERE " + list_name + "_tbl." + list_name[:-1] + "_id = " + params[0]
+    cmd = "DELETE FROM " + list_name + "_tbl WHERE " + list_name + "_tbl." + list_name[:-1] + "_id = " + id
     query = cmd
     cursor.execute(query)
     cursor.close()
     cnx.commit()
     cnx.close()
-    return {'method': 'delete', 'status': 'success'}
+    return {'method': 'DELETE', 'status': 'success'}
 
 
-def create_row(new_data, list_name):
+def create_row(args):
+    new_data = args[0]
+    new_data.pop('token')
+    list_name = args[1]
     cnx = mysql.connector.connect(user=db_conf.settings['DB']['db_user'],
                                   password=db_conf.settings['DB']['db_pass'],
                                   host=db_conf.settings['DB']['db_host'],
@@ -63,27 +70,30 @@ def create_row(new_data, list_name):
     cursor.close()
     cnx.commit()
     cnx.close()
-    return {'method': 'post', 'status': 'success'}
+    return {'method': 'POST', 'status': 'success'}
 
 
-def update_row(new_data, list_name, params):
+def update_row(args):
+    new_data = args[0]
+    list_name = args[1]
+    id = args[2]
     new_data.pop('token', None)
     cnx = mysql.connector.connect(user=db_conf.settings['DB']['db_user'],
                                   password=db_conf.settings['DB']['db_pass'],
                                   host=db_conf.settings['DB']['db_host'],
                                   database=db_conf.settings['DB']['db_user'] + '$' + db_conf.settings['DB']['db_name'])
     cursor = cnx.cursor(dictionary=True)
-    cmd = "UPDATE " + list_name + "_tbl SET " + ','.join([key + " = '" + new_data[key] + "'" for key in new_data.keys()]) + " WHERE " + list_name + "_tbl." + list_name[:-1] + "_id = " + params[0]
+    cmd = "UPDATE " + list_name + "_tbl SET " + ','.join([key + " = '" + new_data[key] + "'" for key in new_data.keys()]) + " WHERE " + list_name + "_tbl." + list_name[:-1] + "_id = " + id
     print(cmd)
     query = cmd
     cursor.execute(query)
     cursor.close()
     cnx.commit()
     cnx.close()
-    return {'method': 'delete', 'status': 'success'}
+    return {'method': 'UPDATE', 'status': 'success'}
 
 
-def authorize(token):
+def verify(token):
     print('signin')
     try:
         idinfo = client.verify_id_token(token, None)
@@ -92,7 +102,7 @@ def authorize(token):
         if idinfo['iss'] not in ['accounts.google.com', 'https://accounts.google.com']:
             raise crypt.AppIdentityError("Wrong issuer.")
     except crypt.AppIdentityError:
-        return {'status': 'signin authentication failed'}
+        return {'status': 'token validation failed'}
     email = idinfo['email']
     print(email)
     return_vals = []
@@ -112,7 +122,7 @@ def authorize(token):
         return {'status': 'success', 'permissions': return_vals[0]['user_permissions']}
     else:
         login_failed(email)
-        return {'status': 'user not found'}
+        return {'status': 'user not registered'}
 
 
 def login_failed(email):
@@ -164,98 +174,118 @@ def login_succeeded(email):
 class HoppersWebService(object):
     exposed = True
 
-    def GET(self, *args):
+    def unhandled(self, method, url, args):
+        cherrypy.response.status = 404
+        return json.dumps({'method': method,
+                           'resource': url,
+                           'status': 'Unhandled resource location ' + str(args)})
+
+    def check_token(self, token, method, url, cb, args):
+        if not token:
+            # token required in order to be verified
+            cherrypy.response.status = 401
+            return json.dumps({'method': method,
+                               'resource': url,
+                               'status': 'missing token'})
+        else:
+            crud = {'POST':   'C',
+                    'GET':    'R',
+                    'PUT':    'U',
+                    'DELETE': 'D',}
+            authorization = verify(token)
+            if authorization['status'] == 'success':
+                # token is authentic and user is registered.
+                if crud[method] in authorization['permissions']:
+                    # user has required permissions
+                    return json.dumps(cb(args))
+                else:
+                    # User lacks READ permissions
+                    cherrypy.response.status = 403
+                    return json.dumps({'method': method,
+                                       'resource': url,
+                                      'status': 'Insufficient privileges'})
+            elif authorization['status'] == 'token validation failed':
+                # bad token.
+                cherrypy.response.status = 401
+                cherrypy.response.headers['Location'] = url
+                return json.dumps({'method': method,
+                                   'resource': url,
+                                   'status': authorization['status']})
+            elif authorization['status'] == 'user not registered':
+                # token OK, but user not registered.
+                cherrypy.response.status = 401
+                cherrypy.response.headers['Location'] = url
+                return json.dumps({'method': method,
+                                   'resource': url,
+                                   'status': authorization['status']})
+            else:
+                # token verification - unhandled response
+                cherrypy.response.status = 401
+                cherrypy.response.headers['Location'] = url
+                return json.dumps({'method': method,
+                                   'resource': url,
+                                   'status': authorization['status']})
+
+    def GET(self, *args, **kwargs):
         print('GET:'+str(args)+cherrypy.request.scheme)
+        token = cherrypy.request.headers.get('Authorization')
+        url = urlparse(cherrypy.url()).path
         if not args:
             args = [None, None]
         if args[0] == 'hoppers' and args[1] == 'manage':
             return self.manage()
         elif args[0] == 'hoppers' and args[1] == 'rest':
-            authorization = authorize(cherrypy.request.headers.get('Authorization'))
-            if authorization['status'] == 'success':
-                if 'R' in authorization['permissions']:
-                    return json.dumps(get_list(args[2]))
-                else:
-                    cherrypy.response.status = 403
-                    return json.dumps({'method': 'GET',
-                                       'status': 'Insufficient privileges'})
+            if not token:
+                # Attempt to access a resource or collection without including token.
+                # Redirect to login page, pass along the requested URL in Location header.
+                cherrypy.response.headers['Location'] = url
+                raise cherrypy.HTTPRedirect("/hoppers/manage/#/" + args[2])
             else:
-                cherrypy.response.status = 401
-                return json.dumps({'method': 'GET',
-                                   'status': authorization['status']})
+                return self.check_token(token, 'GET', url, get_list, args[2:])
         elif args[0] == 'hoppers' and args[1] == 'tokensignin':
-            authorization = authorize(cherrypy.request.headers.get('Authorization'))
-            if authorization['status'] == 'success':
+            def on_success(args=None):
                 return json.dumps({'method': 'GET',
-                                   'status': authorization['status']})
-            else:
-                cherrypy.response.status = 401
-                return json.dumps({'method': 'GET',
-                                   'status': authorization['status']})
+                                   'resource': url,
+                                   'status': 'success',})
+            return self.check_token(token, 'GET', url, on_success, None)
         else:
-            cherrypy.response.status = 404
-            return json.dumps({'method': 'GET',
-                               'status': 'Unhandled resource location '+str(args)})
+            return self.unhandled('GET', url, args)
 
     def POST(self, *args):
         print('POST '+str(args)+cherrypy.request.scheme)
+        token = cherrypy.request.headers.get('Authorization')
+        url = urlparse(cherrypy.url()).path
         rawData = cherrypy.request.body.read(int(cherrypy.request.headers['Content-Length']))
         new_data = json.loads(rawData)
         print('post data: '+str(new_data))
-        authorization = authorize(new_data['token'])
         if args[0] == 'hoppers' and args[1] == 'rest':
-            if authorization['status'] == 'success':
-                if 'C' in authorization['permissions']:
-                    return json.dumps(create_row(new_data, args[2]))
-                else:
-                    return json.dumps({'method': 'POST',
-                                       'status': 'Insufficient permissions ' + str(authorization['permissions'])})
-            else:
-                return json.dumps({'method': 'POST',
-                                   'status': authorization['status']})
+            return self.check_token(token, 'POST', url, create_row, [new_data] + list(args[2:]))
         else:
-            return json.dumps({'method': 'POST',
-                               'status': 'Unhandled resource location '+str(args)})
+            return self.unhandled('POST', url, args)
 
     def PUT(self, *args):
         print('PUT ' + str(args)+cherrypy.request.scheme)
+        token = cherrypy.request.headers.get('Authorization')
+        url = urlparse(cherrypy.url()).path
         rawData = cherrypy.request.body.read(int(cherrypy.request.headers['Content-Length']))
         new_data = json.loads(rawData)
         print('put data: ' + str(new_data))
-        authorization = authorize(new_data['token'])
         if args[0] == 'hoppers' and args[1] == 'rest':
-            if authorization['status'] == 'success':
-                if 'U' in authorization['permissions']:
-                    return json.dumps(update_row(new_data, args[2], args[3:]))
-                else:
-                    return json.dumps({'method': 'PUT',
-                                       'status': 'Insufficient permissions ' + str(authorization['permissions'])})
-            else:
-                return json.dumps({'method': 'PUT',
-                                   'status': authorization['status']})
+            return self.check_token(token, 'PUT', url, update_row, [new_data] + list(args[2:]))
         else:
-            return json.dumps({'method': 'PUT',
-                               'status': 'Unhandled resource location '+str(args)})
+            return self.unhandled('PUT', url, args)
 
     def DELETE(self, *args):
         print('DELETE ' + str(args)+cherrypy.request.scheme)
-        rawData = cherrypy.request.body.read(int(cherrypy.request.headers['Content-Length']))
-        new_data = json.loads(rawData)
-        print('delete data: ' + str(new_data))
-        authorization = authorize(new_data['token'])
+        token = cherrypy.request.headers.get('Authorization')
+        url = urlparse(cherrypy.url()).path
+        #rawData = cherrypy.request.body.read(int(cherrypy.request.headers['Content-Length']))
+        #new_data = json.loads(rawData)
+        #print('delete data: ' + str(new_data))
         if args[0] == 'hoppers' and args[1] == 'rest':
-            if authorization['status'] == 'success':
-                if 'D' in authorization['permissions']:
-                    return json.dumps(remove_row(args[2], args[3:]))
-                else:
-                    return json.dumps({'method': 'DELETE',
-                                       'status': 'Insufficient permissions '+str(authorization['permissions'])})
-            else:
-                return json.dumps({'method': 'DELETE',
-                                   'status': authorization['status']})
+            return self.check_token(token, 'DELETE', url, remove_row, args[2:])
         else:
-            return json.dumps({'method': 'DELETE',
-                               'status': 'Unhandled resource location '+str(args)})
+            return self.unhandled('DELETE', url, args)
 
     def serve_index(self):
         print('index'+cherrypy.request.scheme)
@@ -284,9 +314,6 @@ if __name__ == '__main__':
                 'request.dispatch': cherrypy.dispatch.MethodDispatcher()
             },
             '/hoppers/manage': {
-                'request.dispatch': cherrypy.dispatch.MethodDispatcher()
-            },
-            '/hoppers/bananas': {
                 'request.dispatch': cherrypy.dispatch.MethodDispatcher()
             },
             '/': {

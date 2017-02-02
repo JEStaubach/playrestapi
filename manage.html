@@ -11,116 +11,192 @@
 
         <script>
 
+            function getUrlVars()
+            {
+                var vars = [], hash;
+                var hashes = window.location.href.slice(window.location.href.indexOf('?') + 1).split('&');
+                for(var i = 0; i < hashes.length; i++)
+                {
+                    hash = hashes[i].split('=');
+                    vars.push(hash[0]);
+                    vars[hash[0]] = hash[1];
+                }
+                return vars;
+            };
+
+            function getHash() {
+                return window.location.hash;
+            };
+
             var id_token = null;
             var img_url = null;
 
-            function show_content() {
-                $('#notfound').css('visiblity', 'hidden');
-                $('#insufficient').css("visibility", "hidden");
-                $('#unauthorized').css("visibility", "hidden");
-                $('#signin').css("visibility", "hidden");
-                $('#stuff').css("visibility", "visible");
-                $('#user_image').attr('src', img_url);
-                refresh_rows();
+            function return_to_login() {
+                hide_everything();
+                display_login(true);
             };
 
-            function hide_content() {
-                $('#notfound').css('visiblity', 'hidden');
-                $('#insufficient').css("visibility", "hidden");
-                $('#unauthorized').css("visibility", "hidden");
-                $('#stuff').css("visibility", "hidden");
-                $('#signin').css("visibility", "visible");
+            function logged_out() {
+                hide_everything();
+                display_login(true);
             };
 
-            function unauthorized() {
-                $('#unauthorized').css("visibility", "visible");
+            function logged_in() {
+                hide_everything();
+                display_account_info(true);
+                display_collection(true);
             };
 
-            function insufficient_priveleges() {
-                $('#insufficient').css('visibility', 'visible');
+            function display_account_info(display) {
+                console.log('display_account_info: ' + display);
+                if (display) {
+                    $('#account_info').css('visibility', 'visible');
+                    $('#user_image').attr('src', img_url);
+                } else {
+                    $('#account_info').css("visibility", "hidden");
+                }
             };
 
-            function notfound() {
-                $('#notfound').css('visibility', 'visible');
-            }
+            function display_login(display) {
+                if (display) {
+                    $('#signin').css("visibility", "visible");
+                } else {
+                    $('#signin').css("visibility", "hidden");
+                }
+            };
 
-            function refresh_rows() {
-                console.log('fetching rows');
-                $.ajax({
-                    url:         '/hoppers/rest/locations',
-                    type:        "GET",
-                    contentType: "application/json;",
-                    dataType:    "json",
-                    beforeSend : function( xhr ) {
-                        xhr.setRequestHeader( "Authorization", id_token );
-                    },
-                    success:     function (msg) {
-                        console.log(msg);
-                        json_response = msg;
-                        //json_response = jQuery.parseJSON(msg);
-                        $('#rows_holder').empty();
-                        $('#rows_holder').append( '<table id="rows_table"></table>' );
-                        for (var i = 0; i < json_response.length; i++) {
-                            console.log(json_response[i]);
-                            $('#rows_table').append('<tr id="rows_table_' + i.toString() + '"></tr>');
-                            for (var key in json_response[i]) {
-                                if (json_response[i].hasOwnProperty(key)) {
-                                    $('#rows_table_'+i.toString()).append('<td>'+json_response[i][key].toString()+'</td>');
-                                    console.log(key + " -> " + json_response[i][key]);
-                                }
-                            }
-                            $('#rows_table_'+i.toString()).append('<td><a href="#" id="rows_table_edit' + i.toString() + '_id">Edit</a></td>');
-                            $('#rows_table_edit'+i.toString()+'_id').click({p1: json_response, p2: i}, function(event) {
-                                value = $('#location_name').val();
-                                data = { 'location_name': value, 'token': id_token };
-                                $.ajax({
-                                    url:         '/hoppers/rest/locations/'+event.data.p1[event.data.p2].location_id.toString(),
-                                    type:        "PUT",
-                                    contentType: "application/json;",
-                                    data:        JSON.stringify(data),
-                                    dataType:    "json",
-                                    success:     function (msg) {
-                                        console.log(msg);
-                                        refresh_rows();
-                                    },
-                                    error:       function (err){
-                                        console.log(err)
-                                        refresh_rows();
-                                    }
-                                });
-                                return false;
-                            });
-                            $('#rows_table_'+i.toString()).append('<td><a href="#" id="rows_table_delete' + i.toString() + '_id">Delete</a></td>');
-                            $('#rows_table_delete'+i.toString()+'_id').click({p1: json_response, p2: i}, function(event) {
-                                data = { 'token': id_token };
-                                $.ajax({
-                                    url:         '/hoppers/rest/locations/'+event.data.p1[event.data.p2].location_id.toString(),
-                                    type:        "DELETE",
-                                    contentType: "application/json;",
-                                    data:        JSON.stringify(data),
-                                    success:     function (msg) {
-                                        console.log(msg);
-                                        refresh_rows();
-                                    },
-                                    error:       function (err){
-                                        console.log(err)
-                                        refresh_rows();
-                                    }
-                                });
-                                return false;
-                            });
-                        }
-                    },
-                    error:       function (err){
-                        console.log(err)
-                        if ( err['status'] == 403 ) {
-                            insufficient_priveleges();
-                        };
-                        if ( err['status'] == 404 ) {
-                            notfound();
-                        }
+            function display_collection(display) {
+                if (display) {
+                    hash = getHash()
+                    if (hash) {
+                        console.log('hash: ' + hash);
+                        $('#title').html(hash.slice(2));
+                        $('#stuff').css("visibility", "visible");
+                        refresh_rows(hash.slice(2));
                     }
-                });
+                } else {
+                    $('#stuff').css("visibility", "hidden");
+                }
+            };
+
+            function display_not_found(display) {
+                if (display) {
+                    $('#notfound').css('visibility', 'visible');
+                } else {
+                    $('#notfound').css('visibility', 'hidden');
+                }
+            };
+
+            function display_insufficient(display) {
+                if (display) {
+                    $('#insufficient').css('visibility', 'visible');
+                } else {
+                    $('#insufficient').css('visibility', 'hidden');
+                }
+            };
+
+            function display_unauthorized(display) {
+                if (display) {
+                    $('#unauthorized').css('visibility', 'visible');
+                } else {
+                    $('#unauthorized').css('visibility', 'hidden');
+                }
+            };
+
+            function hide_everything() {
+                display_not_found(false);
+                display_insufficient(false);
+                display_unauthorized(false);
+                display_collection(false);
+                display_login(false);
+                display_account_info(false);
+            };
+
+            function refresh_rows(collection) {
+                if (collection) {
+                    console.log('fetching rows');
+                    $.ajax({
+                        url:         '/hoppers/rest/' + collection,
+                        type:        "GET",
+                        contentType: "application/json;",
+                        dataType:    "json",
+                        beforeSend : function( xhr ) {
+                            xhr.setRequestHeader( "Authorization", id_token );
+                        },
+                        success:     function (msg) {
+                            console.log(msg);
+                            json_response = msg;
+                            //json_response = jQuery.parseJSON(msg);
+                            $('#rows_holder').empty();
+                            $('#rows_holder').append( '<table id="rows_table"></table>' );
+                            for (var i = 0; i < json_response.length; i++) {
+                                console.log(json_response[i]);
+                                $('#rows_table').append('<tr id="rows_table_' + i.toString() + '"></tr>');
+                                for (var key in json_response[i]) {
+                                    if (json_response[i].hasOwnProperty(key)) {
+                                        $('#rows_table_'+i.toString()).append('<td>'+json_response[i][key].toString()+'</td>');
+                                        console.log(key + " -> " + json_response[i][key]);
+                                    }
+                                }
+                                $('#rows_table_'+i.toString()).append('<td><a href="#" id="rows_table_edit' + i.toString() + '_id">Edit</a></td>');
+                                $('#rows_table_edit'+i.toString()+'_id').click({p1: json_response, p2: i}, function(event) {
+                                    value = $('#location_name').val();
+                                    data = { 'location_name': value, 'token': id_token };
+                                    $.ajax({
+                                        url:         '/hoppers/rest/'+collection+'/'+event.data.p1[event.data.p2].location_id.toString(),
+                                        type:        "PUT",
+                                        contentType: "application/json;",
+                                        data:        JSON.stringify(data),
+                                        dataType:    "json",
+                                        beforeSend : function( xhr ) {
+                                            xhr.setRequestHeader( "Authorization", id_token );
+                                        },
+                                        success:     function (msg) {
+                                            console.log(msg);
+                                            refresh_rows(collection);
+                                        },
+                                        error:       function (err){
+                                            console.log(err)
+                                            refresh_rows(collection);
+                                        }
+                                    });
+                                    return false;
+                                });
+                                $('#rows_table_'+i.toString()).append('<td><a href="#" id="rows_table_delete' + i.toString() + '_id">Delete</a></td>');
+                                $('#rows_table_delete'+i.toString()+'_id').click({p1: json_response, p2: i}, function(event) {
+                                    data = { 'token': id_token };
+                                    $.ajax({
+                                        url:         '/hoppers/rest/'+collection+'/'+event.data.p1[event.data.p2].location_id.toString(),
+                                        type:        "DELETE",
+                                        contentType: "application/json;",
+                                        data:        JSON.stringify(data),
+                                        beforeSend : function( xhr ) {
+                                            xhr.setRequestHeader( "Authorization", id_token );
+                                        },
+                                        success:     function (msg) {
+                                            console.log(msg);
+                                            refresh_rows(collection);
+                                        },
+                                        error:       function (err){
+                                            console.log(err)
+                                            refresh_rows(collection);
+                                        }
+                                    });
+                                    return false;
+                                });
+                            }
+                        },
+                        error:       function (err){
+                            console.log(err)
+                            if ( err['status'] == 403 ) {
+                                display_insufficient();
+                            };
+                            if ( err['status'] == 404 ) {
+                                display_not_found();
+                            }
+                        }
+                    });
+                };
             };
 
             function onSignIn(googleUser) {
@@ -149,48 +225,64 @@
                     },
                     success:     function (msg) {
                         console.log(msg);
-                        show_content();
+                        logged_in();
                     },
                     error:       function (err){
+                        console.log('tokensignin error');
                         console.log(err);
-                        hide_content();
-                        unauthorized();
+                        hide_everything();
+                        display_unauthorized(true);
                     }
                 });
                 return false;
             };
 
+            function signout() {
+                var auth2 = gapi.auth2.getAuthInstance();
+                auth2.signOut().then(function () {
+                    console.log('User signed out.');
+                    logged_out();
+                });
+            }
+
             $(document).ready(function() {
 
                 $('#signout').click(function() {
-                    var auth2 = gapi.auth2.getAuthInstance();
-                    auth2.signOut().then(function () {
-                    console.log('User signed out.');
-                    hide_content();
-                });
+                    signout();
                     return false;
                 });
 
                 $('#add_button').click(function() {
+                    hash = getHash();
+                    console.log('hash: ' + hash);
+                    collection = hash.slice(2);
                     value = $('#location_name').val();
                     console.log(value);
                     data = { 'location_name': value, 'token': id_token };
                     console.log(data);
                     $.ajax({
-                        url:         '/hoppers/rest/locations/',
+                        url:         '/hoppers/rest/'+collection+'/',
                         type:        "POST",
                         contentType: "application/json;",
                         data:        JSON.stringify(data),
                         dataType:    "json",
+                        beforeSend : function( xhr ) {
+                            xhr.setRequestHeader( "Authorization", id_token );
+                        },
                         success:     function (msg) {
                             console.log(msg);
-                            refresh_rows();
+                            refresh_rows(collection);
                         },
                         error:       function (err){
                             console.log(err)
-                            refresh_rows();
+                            refresh_rows(collection);
                         }
                     });
+                    return false;
+                });
+
+                $('#return').click(function() {
+                    signout();
                     return false;
                 });
 
@@ -207,10 +299,13 @@
         </div>
 
         <div id="stuff" style="visibility:hidden;">
-            <h1>Locations</h1>
+            <h1 id="title">Collection</h1>
             <div id="rows_holder">
             </div>
             <p>Location Name: <input type="text" name="location_name" id="location_name"/><button id="add_button">Add</button></p>
+        </div>
+
+        <div id="account_info" style="visibility:hidden;">
             <p><img id="user_image"/></p>
             <a id="signout" href="#">Sign out</a>
         </div>
@@ -218,6 +313,7 @@
         <div id="unauthorized" style="visibility:hidden;">
             <h1>Unauthorized</h1>
             <p>User could not be authenticated or is not authorized.</p>
+            <a id="return" href="#">Return to login</a>
         </div>
 
         <div id="insufficient" style="visibility:hidden;">
