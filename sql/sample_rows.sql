@@ -39,3 +39,16 @@ INSERT INTO paddles_tbl ( paddle_name, boattype_fk, boatstyle_fk, shaft_fk, padd
 
 INSERT INTO trailers_tbl ( trailer_name, trailer_axles, trailer_description, trailer_vin, trailer_licenseplate_number, trailer_registration_expiration, trailer_inspection_expiration, trailer_usable, trailer_owner ) VALUES ( 'Purple Trailer', 2, 'Purple 2-axle, 3 mast', '', '', NULL, NULL, b'0', 'Club' );
 INSERT INTO trailers_tbl ( trailer_name, trailer_axles, trailer_description, trailer_vin, trailer_licenseplate_number, trailer_registration_expiration, trailer_inspection_expiration, trailer_usable, trailer_owner ) VALUES ( 'Red Trailer', 1, 'Red 1-axle, 2 mast', '', '', NULL, NULL, b'0', 'Club' );
+
+INSERT INTO exposedviews_tbl ( exposedview_name ) VALUES ( 'participants');
+INSERT INTO exposedviews_tbl ( exposedview_name ) VALUES ( 'skilllevels');
+INSERT INTO exposedviews_tbl ( exposedview_name ) VALUES ( 'locations');
+INSERT INTO exposedviews_tbl ( exposedview_name ) VALUES ( 'boattypes');
+INSERT INTO exposedviews_tbl ( exposedview_name ) VALUES ( 'boatstyles');
+INSERT INTO exposedviews_tbl ( exposedview_name ) VALUES ( 'boats');
+INSERT INTO exposedviews_tbl ( exposedview_name ) VALUES ( 'paddles');
+INSERT INTO exposedviews_tbl ( exposedview_name ) VALUES ( 'shafts');
+INSERT INTO exposedviews_tbl ( exposedview_name ) VALUES ( 'trailers');
+INSERT INTO exposedviews_tbl ( exposedview_name ) VALUES ( 'users');
+INSERT INTO exposedviews_tbl ( exposedview_name ) VALUES ( 'failedlogins');
+INSERT INTO exposedviews_tbl ( exposedview_name ) VALUES ( 'logins');

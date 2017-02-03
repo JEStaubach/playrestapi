@@ -10,6 +10,7 @@ DROP VIEW trailers;
 DROP VIEW users;
 DROP VIEW failedlogins;
 DROP VIEW logins;
+DROP VIEW exposedviews;
 
 DROP TABLE participants_tbl;
 DROP TABLE skilllevels_tbl;
@@ -23,6 +24,7 @@ DROP TABLE trailers_tbl;
 DROP TABLE users_tbl;
 DROP TABLE failedlogins_tbl;
 DROP TABLE logins_tbl;
+DROP TABLE exposedviews_tbl;
 
 CREATE TABLE skilllevels_tbl (
 	skilllevel_id INT NOT NULL AUTO_INCREMENT,
@@ -166,3 +168,10 @@ CREATE TABLE logins_tbl (
 
 CREATE VIEW logins AS SELECT * FROM logins_tbl;
 
+CREATE TABLE exposedviews_tbl (
+    exposedview_id INT NOT NULL AUTO_INCREMENT,
+    exposedview_name VARCHAR(256),
+    PRIMARY KEY (exposedview_id))
+);
+
+CREATE VIEW exposedviews AS SELECT * FROM exposedviews_tbl;

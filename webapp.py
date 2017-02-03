@@ -57,7 +57,6 @@ def remove_row(args):
 
 def create_row(args):
     new_data = args[0]
-    new_data.pop('token')
     list_name = args[1]
     cnx = mysql.connector.connect(user=db_conf.settings['DB']['db_user'],
                                   password=db_conf.settings['DB']['db_pass'],
@@ -77,7 +76,6 @@ def update_row(args):
     new_data = args[0]
     list_name = args[1]
     id = args[2]
-    new_data.pop('token', None)
     cnx = mysql.connector.connect(user=db_conf.settings['DB']['db_user'],
                                   password=db_conf.settings['DB']['db_pass'],
                                   host=db_conf.settings['DB']['db_host'],
@@ -173,12 +171,65 @@ def login_succeeded(email):
 
 class HoppersWebService(object):
     exposed = True
+    exposed_views = {}
+
+    def __init__(self):
+        print('init called')
+        self.get_exposed_views()
+        print(str(self.exposed_views))
+
+    def get_exposed_views(self):
+        cnx = mysql.connector.connect(user=db_conf.settings['DB']['db_user'],
+                                      password=db_conf.settings['DB']['db_pass'],
+                                      host=db_conf.settings['DB']['db_host'],
+                                      database=db_conf.settings['DB']['db_user'] + '$' + db_conf.settings['DB'][
+                                          'db_name'])
+        cursor = cnx.cursor(dictionary=True)
+        query = ("SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME IN (SELECT exposedview_name FROM exposedviews)")
+        cursor.execute(query)
+        self.exposed_views = {}
+        for row in cursor:
+            row_dict = dict(row)
+            if row_dict['TABLE_NAME'] not in self.exposed_views.keys():
+                self.exposed_views[str(row_dict['TABLE_NAME'])] = []
+            self.exposed_views[str(row_dict['TABLE_NAME'])].append({'column_name': row_dict['COLUMN_NAME'],
+                                                                    'column_type': row_dict['DATA_TYPE']})
+        cursor.close()
+        cnx.close()
 
     def unhandled(self, method, url, args):
         cherrypy.response.status = 404
         return json.dumps({'method': method,
                            'resource': url,
                            'status': 'Unhandled resource location ' + str(args)})
+
+    def bad_fields(self, method, url, args, field_errors):
+        cherrypy.response.status = 400
+        return json.dumps({'method': method,
+                           'resource': url,
+                           'status': 'Unknown resource attributes: ' + str(field_errors)})
+
+    def collection_exposed(self, collection):
+        if collection in self.exposed_views.keys():
+            return True
+        else:
+            return False
+
+    def field_mismatches(self, collection, new_data):
+        allowed_fields = [x['column_name'] for x in self.exposed_views[collection]]
+        print('collection: ' + collection)
+        print('allowed_fields: ' + str(allowed_fields))
+        additional_supplied_fields = [x for x in new_data.keys() if x not in allowed_fields]
+        unsupplied_fields = [x for x in allowed_fields if x not in new_data.keys() and x != collection[:-1] + '_id']
+        tables_with_unsupplied_ids = [x[:-3] for x in unsupplied_fields if x[-3:] == '_id']
+        missing_fields = []
+        for table in tables_with_unsupplied_ids:
+            for field in new_data.keys():
+                if table in field:
+                    missing_fields.append(table + '_id')
+        return {'additional_supplied_fields': additional_supplied_fields,
+                'unsupplied_fields': unsupplied_fields,
+                'missing_fields': missing_fields}
 
     def check_token(self, token, method, url, cb, args):
         if not token:
@@ -241,6 +292,8 @@ class HoppersWebService(object):
                 cherrypy.response.headers['Location'] = url
                 raise cherrypy.HTTPRedirect("/hoppers/manage/#/" + args[2])
             else:
+                if not self.collection_exposed(args[2]):
+                    return self.unhandled('GET', url, args[2:])
                 return self.check_token(token, 'GET', url, get_list, args[2:])
         elif args[0] == 'hoppers' and args[1] == 'tokensignin':
             def on_success(args=None):
@@ -259,6 +312,11 @@ class HoppersWebService(object):
         new_data = json.loads(rawData)
         print('post data: '+str(new_data))
         if args[0] == 'hoppers' and args[1] == 'rest':
+            if not self.collection_exposed(args[2]):
+                return self.unhandled('POST', url, args[2:])
+            field_errors = self.field_mismatches(args[2], new_data)
+            if field_errors['additional_supplied_fields'] or field_errors['unsupplied_fields']:
+                return self.bad_fields('POST', url, args[2:], field_errors)
             return self.check_token(token, 'POST', url, create_row, [new_data] + list(args[2:]))
         else:
             return self.unhandled('POST', url, args)
@@ -271,6 +329,11 @@ class HoppersWebService(object):
         new_data = json.loads(rawData)
         print('put data: ' + str(new_data))
         if args[0] == 'hoppers' and args[1] == 'rest':
+            if not self.collection_exposed(args[2]):
+                return self.unhandled('PUT', url, args[2:])
+            field_errors = self.field_mismatches(args[2], new_data)
+            if field_errors['additional_supplied_fields'] or field_errors['missing_fields']:
+                return self.bad_fields('PUT', url, args[2:], field_errors)
             return self.check_token(token, 'PUT', url, update_row, [new_data] + list(args[2:]))
         else:
             return self.unhandled('PUT', url, args)
@@ -283,6 +346,8 @@ class HoppersWebService(object):
         #new_data = json.loads(rawData)
         #print('delete data: ' + str(new_data))
         if args[0] == 'hoppers' and args[1] == 'rest':
+            if not self.collection_exposed(args[2]):
+                return self.unhandled('DELETE', url, args[2:])
             return self.check_token(token, 'DELETE', url, remove_row, args[2:])
         else:
             return self.unhandled('DELETE', url, args)

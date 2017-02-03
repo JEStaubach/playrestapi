@@ -141,7 +141,7 @@
                                 $('#rows_table_'+i.toString()).append('<td><a href="#" id="rows_table_edit' + i.toString() + '_id">Edit</a></td>');
                                 $('#rows_table_edit'+i.toString()+'_id').click({p1: json_response, p2: i}, function(event) {
                                     value = $('#location_name').val();
-                                    data = { 'location_name': value, 'token': id_token };
+                                    data = { 'location_name': value };
                                     $.ajax({
                                         url:         '/hoppers/rest/'+collection+'/'+event.data.p1[event.data.p2].location_id.toString(),
                                         type:        "PUT",
@@ -164,12 +164,11 @@
                                 });
                                 $('#rows_table_'+i.toString()).append('<td><a href="#" id="rows_table_delete' + i.toString() + '_id">Delete</a></td>');
                                 $('#rows_table_delete'+i.toString()+'_id').click({p1: json_response, p2: i}, function(event) {
-                                    data = { 'token': id_token };
                                     $.ajax({
                                         url:         '/hoppers/rest/'+collection+'/'+event.data.p1[event.data.p2].location_id.toString(),
                                         type:        "DELETE",
                                         contentType: "application/json;",
-                                        data:        JSON.stringify(data),
+                                        //data:        JSON.stringify(data),
                                         beforeSend : function( xhr ) {
                                             xhr.setRequestHeader( "Authorization", id_token );
                                         },
@@ -189,10 +188,10 @@
                         error:       function (err){
                             console.log(err)
                             if ( err['status'] == 403 ) {
-                                display_insufficient();
+                                display_insufficient(true);
                             };
                             if ( err['status'] == 404 ) {
-                                display_not_found();
+                                display_not_found(true);
                             }
                         }
                     });
@@ -258,7 +257,7 @@
                     collection = hash.slice(2);
                     value = $('#location_name').val();
                     console.log(value);
-                    data = { 'location_name': value, 'token': id_token };
+                    data = { 'location_name': value };
                     console.log(data);
                     $.ajax({
                         url:         '/hoppers/rest/'+collection+'/',
